@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct RegistrationView: View {
+    let role: String
+    @Environment(\.presentationMode) var presentationMode
+    
     @State private var firstName: String = ""
     @State private var lastName: String = ""
     @State private var email: String = ""
@@ -9,180 +12,411 @@ struct RegistrationView: View {
     @State private var password: String = ""
     @State private var agreedToTerms: Bool = false
     
+    @State private var isLoading = false
+    @State private var showAlert = false
+    @State private var alertMessage = ""
+    @State private var alertTitle = ""
+    @State private var isSuccess = false
+    @State private var fieldErrors: [String: String] = [:]
+    @State private var navigateToProfile = false
+    @State private var serverError: String? = nil
+    
+    init(role: String) {
+        self.role = role
+    }
+    
     var body: some View {
-        ZStack {
-            Color(red: 0.957, green: 0.957, blue: 0.957)
-                .edgesIgnoringSafeArea(.all)
-            
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Header with logo
-                    ZStack(alignment: .center) {
-                        Text("Realstate")
-                            .font(.system(size: 40, weight: .heavy))
-                            .fontWeight(.black)
-                            .foregroundColor(.black)
-                            .alignmentGuide(.top) { d in d[.bottom] - 25 }
-                        
+        NavigationView {
+            ZStack {
+                Color(red: 0.957, green: 0.957, blue: 0.957)
+                    .edgesIgnoringSafeArea(.all)
+                
+                ScrollView {
+                    VStack(spacing: 0) {
                         HStack {
+                            Button(action: {
+                                presentationMode.wrappedValue.dismiss()
+                            }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundColor(Color(red: 0, green: 0.34, blue: 0.72))
+                                    .padding(.leading, 16)
+                                    .padding(.top, 16)
+                            }
                             Spacer()
-                            Image("logo")
-                                .resizable()
-                                .frame(width: 51, height: 51)
-                                .alignmentGuide(.top) { d in d[.bottom] - 25.5 }
-                                .offset(x: -20)
                         }
-                    }
-                    .frame(height: 60)
-                    .padding(.top, 60)
-                    .padding(.horizontal, 16)
-                    
-                    Text("Создать аккаунт")
-                        .font(.system(size: 20, weight: .semibold))
-                        .padding(.top, 24)
-                    
-                    // Form fields
-                    VStack(spacing: 16) {
-                        // Name fields in a row
-                        HStack(spacing: 16) {
+                        
+                        ZStack(alignment: .center) {
+                            Text("Realstate")
+                                .font(.system(size: 40, weight: .heavy))
+                                .fontWeight(.black)
+                                .foregroundColor(.black)
+                                .alignmentGuide(.top) { d in d[.bottom] - 25 }
+                            
+                            HStack {
+                                Spacer()
+                                Image("logo")
+                                    .resizable()
+                                    .frame(width: 51, height: 51)
+                                    .alignmentGuide(.top) { d in d[.bottom] - 25.5 }
+                                    .offset(x: -20)
+                            }
+                        }
+                        .frame(height: 60)
+                        .padding(.top, 20)
+                        .padding(.horizontal, 16)
+                        
+                        Text("Создать аккаунт")
+                            .font(.system(size: 20, weight: .semibold))
+                            .padding(.top, 24)
+                        
+                        if let serverError = serverError {
+                            Text(serverError)
+                                .foregroundColor(.red)
+                                .font(.system(size: 14))
+                                .padding(.horizontal)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 8)
+                        }
+                        
+                        VStack(spacing: 16) {
+                            HStack(spacing: 16) {
+                                CustomTextField(
+                                    title: "Имя",
+                                    placeholder: "",
+                                    text: $firstName,
+                                    errorMessage: fieldErrors["firstName"]
+                                )
+                                
+                                CustomTextField(
+                                    title: "Фамилия",
+                                    placeholder: "",
+                                    text: $lastName,
+                                    errorMessage: fieldErrors["lastName"]
+                                )
+                            }
+                            .padding(.top, 32)
+                            
                             CustomTextField(
-                                title: "Имя",
+                                title: "Email",
                                 placeholder: "",
-                                text: $firstName
+                                text: $email,
+                                errorMessage: fieldErrors["email"]
+                            )
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                            
+                            CustomTextField(
+                                title: "Номер телефона",
+                                placeholder: "",
+                                text: $phoneNumber,
+                                errorMessage: fieldErrors["phoneNumber"]
+                            )
+                            .keyboardType(.phonePad)
+                            
+                            CustomTextField(
+                                title: "Дата рождения",
+                                placeholder: "ДД.ММ.ГГГГ",
+                                text: $birthDate,
+                                errorMessage: fieldErrors["birthDate"]
                             )
                             
                             CustomTextField(
-                                title: "Фамилия",
+                                title: "Пароль",
                                 placeholder: "",
-                                text: $lastName
+                                text: $password,
+                                isSecure: true,
+                                errorMessage: fieldErrors["password"]
                             )
                         }
-                        .padding(.top, 32)
+                        .padding(.horizontal, 16)
                         
-                        CustomTextField(
-                            title: "Email",
-                            placeholder: "",
-                            text: $email
-                        )
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                        
-                        CustomTextField(
-                            title: "Номер телефона",
-                            placeholder: "",
-                            text: $phoneNumber
-                        )
-                        .keyboardType(.phonePad)
-                        
-                        CustomTextField(
-                            title: "Дата рождения",
-                            placeholder: "",
-                            text: $birthDate
-                        )
-                        
-                        CustomTextField(
-                            title: "Пароль",
-                            placeholder: "",
-                            text: $password,
-                            isSecure: true
-                        )
-                    }
-                    .padding(.horizontal, 16)
-                    
-                    // Terms checkbox
-                    HStack {
-                        Button(action: {
-                            agreedToTerms.toggle()
-                        }) {
-                            Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
-                                .foregroundColor(agreedToTerms ? .blue : .gray)
+                        HStack {
+                            Button(action: {
+                                agreedToTerms.toggle()
+                            }) {
+                                Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
+                                    .foregroundColor(agreedToTerms ? .blue : .gray)
+                            }
+                            
+                            Text("Согласен с условиями")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
                         }
+                        .padding(.top, 16)
                         
-                        Text("Согласен с условиями")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.top, 16)
-                    
-                    // Next button (blue)
-                    Button(action: {}) {
-                        Text("Далее")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(Color(red: 0, green: 0.34, blue: 0.72)) // #0057B8
-                            .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 32)
-                    
-                    // Already have account
-                    Text("Уже есть аккаунт? Войти здесь")
-                        .font(.system(size: 16))
-                        .foregroundColor(.gray)
-                        .padding(.top, 32)
-                    
-                    // Or divider
-                    HStack {
-                        Color(red: 0.2, green: 0.2, blue: 0.2)
-                            .frame(height: 1)
-                        
-                        Text("или")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                            .padding(.horizontal, 8)
-                        
-                        Color(red: 0.2, green: 0.2, blue: 0.2)
-                            .frame(height: 1)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 32)
-                    
-                    // Social buttons
-                    VStack(spacing: 16) {
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "applelogo")
-                                    .foregroundColor(.white)
-                                Text("Войти через Apple")
-                                    .font(.system(size: 16, weight: .medium))
+                        Button(action: registerUser) {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Далее")
+                                    .font(.system(size: 18, weight: .regular))
                                     .foregroundColor(.white)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(Color(red: 0.2, green: 0.2, blue: 0.2))
-                            .cornerRadius(12)
                         }
+                        .disabled(isLoading)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color(red: 0, green: 0.34, blue: 0.72))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 32)
                         
-                        Button(action: {}) {
-                            HStack {
-                                Image("google-icon")
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-                                Text("Войти через Google")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(Color(red: 0.2, green: 0.2, blue: 0.2))
-                            .cornerRadius(12)
+                        NavigationLink(destination: LoginView()) {
+                            Text("Уже есть аккаунт? Войти здесь")
+                                .font(.system(size: 16))
+                                .foregroundColor(.gray)
                         }
+                        .padding(.top, 32)
+                        
+                        HStack {
+                            Color(red: 0.2, green: 0.2, blue: 0.2)
+                                .frame(height: 1)
+                            
+                            Text("или")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                                .padding(.horizontal, 8)
+                            
+                            Color(red: 0.2, green: 0.2, blue: 0.2)
+                                .frame(height: 1)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 32)
+                        
+                        VStack(spacing: 16) {
+                            Button(action: {}) {
+                                HStack {
+                                    Image(systemName: "applelogo")
+                                        .foregroundColor(.white)
+                                    Text("Войти через Apple")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                                .background(Color(red: 0.2, green: 0.2, blue: 0.2))
+                                .cornerRadius(12)
+                            }
+                            
+                            Button(action: {}) {
+                                HStack {
+                                    Image("google-icon")
+                                        .resizable()
+                                        .frame(width: 20, height: 20)
+                                    Text("Войти через Google")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                                .background(Color(red: 0.2, green: 0.2, blue: 0.2))
+                                .cornerRadius(12)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 40)
                 }
             }
+            .navigationBarTitle("", displayMode: .inline)
+            .navigationBarHidden(true)
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text(alertTitle),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK")) {
+                        if isSuccess {
+                            navigateToProfile = true
+                        }
+                    }
+                )
+            }
+            .background(
+                NavigationLink(
+                    destination: ProfileView(),
+                    isActive: $navigateToProfile,
+                    label: { EmptyView() }
+                )
+            )
         }
-        .navigationBarHidden(true)
+        .navigationViewStyle(.stack)
+    }
+    
+    private func registerUser() {
+            guard validateForm() else { return }
+            
+            isLoading = true
+            fieldErrors = [:]
+            serverError = nil
+            
+            let registerData: [String: Any] = [
+                "firstName": firstName,
+                "lastName": lastName,
+                "email": email,
+                "phone": phoneNumber,
+                "birthDate": birthDate,
+                "password": password,
+                "role": role
+            ]
+            
+            guard let url = URL(string: "http://localhost:3000/api/users/register/") else {
+                showAlert(title: "Ошибка", message: "Неверный URL сервера", isSuccess: false)
+                isLoading = false
+                return
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: registerData)
+            } catch {
+                showAlert(title: "Ошибка", message: "Ошибка формирования данных", isSuccess: false)
+                isLoading = false
+                return
+            }
+            
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                DispatchQueue.main.async {
+                    isLoading = false
+                    
+                    if let error = error {
+                        serverError = "Ошибка сети: \(error.localizedDescription)"
+                        return
+                    }
+                    
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        serverError = "Неверный ответ сервера"
+                        return
+                    }
+                    
+                    print("Status code:", httpResponse.statusCode)
+                    
+                    guard let data = data else {
+                        serverError = "Пустой ответ от сервера"
+                        return
+                    }
+                    
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        print("Response:", responseString)
+                    }
+                    
+                    do {
+                        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                        
+                        if httpResponse.statusCode == 201 {
+                            showAlert(title: "Успешно", message: "Регистрация завершена!", isSuccess: true)
+                        } else {
+                            if let errorMessage = json?["error"] as? String {
+                                serverError = errorMessage
+                            } else if let message = json?["message"] as? String {
+                                serverError = message
+                            } else {
+                                serverError = "Неизвестная ошибка сервера (код \(httpResponse.statusCode))"
+                            }
+                        }
+                    } catch {
+                        serverError = "Ошибка обработки ответа сервера"
+                        print("Error parsing response:", error)
+                    }
+                }
+            }.resume()
+        }
+    
+    private func handleServerResponse(data: Data, statusCode: Int) {
+        do {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            if let errors = json?["errors"] as? [[String: String]] {
+                var errorDict = [String: String]()
+                for error in errors {
+                    if let field = error["param"], let msg = error["msg"] {
+                        errorDict[field] = msg
+                    }
+                }
+                fieldErrors = errorDict
+                
+                if errorDict.isEmpty {
+                    serverError = json?["message"] as? String ?? "Неизвестная ошибка сервера"
+                }
+            } else if let message = json?["message"] as? String {
+                serverError = message
+            } else {
+                serverError = "Ошибка сервера (код \(statusCode))"
+            }
+        } catch {
+            serverError = "Ошибка обработки ответа сервера"
+            print("Error parsing response:", error)
+        }
+    }
+    
+    private func validateForm() -> Bool {
+        var isValid = true
+        var errors = [String: String]()
+        
+        if firstName.isEmpty {
+            errors["firstName"] = "Имя обязательно"
+            isValid = false
+        } else if firstName.count < 2 {
+            errors["firstName"] = "Имя должно содержать минимум 2 символа"
+            isValid = false
+        }
+        
+        if lastName.isEmpty {
+            errors["lastName"] = "Фамилия обязательна"
+            isValid = false
+        } else if lastName.count < 2 {
+            errors["lastName"] = "Фамилия должна содержать минимум 2 символа"
+            isValid = false
+        }
+        
+        if email.isEmpty {
+            errors["email"] = "Email обязателен"
+            isValid = false
+        } else if !email.isValidEmail {
+            errors["email"] = "Некорректный email"
+            isValid = false
+        }
+        
+        if password.isEmpty {
+            errors["password"] = "Пароль обязателен"
+            isValid = false
+        } else if password.count < 8 {
+            errors["password"] = "Пароль должен содержать минимум 8 символов"
+            isValid = false
+        }
+        
+        if !agreedToTerms {
+            showAlert(title: "Ошибка", message: "Необходимо согласиться с условиями", isSuccess: false)
+            return false
+        }
+        
+        fieldErrors = errors
+        return isValid
+    }
+    
+    private func showAlert(title: String, message: String, isSuccess: Bool) {
+        alertTitle = title
+        alertMessage = message
+        self.isSuccess = isSuccess
+        showAlert = true
     }
 }
 
+extension String {
+    var isValidEmail: Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: self)
+    }
+}
 
 struct RegistrationView_Previews: PreviewProvider {
     static var previews: some View {
-        RegistrationView()
+        RegistrationView(role: "tenant")
     }
 }

@@ -5,7 +5,6 @@ struct User: Codable, Identifiable {
     let role: String?
     let lastName: String?
     
-    // Mock для превью
     static let mock = User(
         id: 1,
         name: "Иван Иванов",

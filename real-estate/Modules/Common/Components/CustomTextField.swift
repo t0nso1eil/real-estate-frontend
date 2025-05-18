@@ -1,17 +1,8 @@
-//
-//  CustomTextField.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 17.05.2025.
-//
-
-
-// CustomTextField.swift
 import SwiftUI
 
 struct CustomTextField: View {
-    var title: String
-    var placeholder: String
+    let title: String
+    let placeholder: String
     @Binding var text: String
     var isSecure: Bool = false
     var errorMessage: String?
@@ -20,19 +11,31 @@ struct CustomTextField: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 14))
-                .foregroundColor(.secondaryText)
+                .foregroundColor(.gray)
             
             if isSecure {
                 SecureField(placeholder, text: $text)
-                    .textFieldStyle(CustomTextFieldStyle())
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(errorMessage != nil ? Color.red : Color.gray, lineWidth: 1)
+                    )
             } else {
                 TextField(placeholder, text: $text)
-                    .textFieldStyle(CustomTextFieldStyle())
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(errorMessage != nil ? Color.red : Color.gray, lineWidth: 1)
+                    )
             }
             
             if let error = errorMessage {
                 Text(error)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundColor(.red)
             }
         }

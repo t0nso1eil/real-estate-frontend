@@ -1,11 +1,3 @@
-//
-//  AuthService.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 17.05.2025.
-//
-
-// AuthService.swift
 import Foundation
 
 class AuthService {
@@ -27,7 +19,6 @@ class AuthService {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            // Обработка ответа
             if let error = error {
                 completion(.failure(error))
                 return
@@ -61,7 +52,6 @@ class AuthService {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            // Аналогичная обработка
         }.resume()
     }
 }

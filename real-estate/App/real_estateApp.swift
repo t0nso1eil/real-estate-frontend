@@ -1,10 +1,3 @@
-//
-//  real_estateApp.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 17.05.2025.
-//
-
 import SwiftUI
 
 @main

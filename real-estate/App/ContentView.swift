@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 17.05.2025.
-//
-
 import SwiftUI
 
 struct ContentView: View {
@@ -15,7 +8,7 @@ struct ContentView: View {
             if authManager.isAuthenticated {
                 ProfileView()
             } else {
-                AuthView()
+                PredAuthView()
             }
         }
         .environmentObject(authManager)
