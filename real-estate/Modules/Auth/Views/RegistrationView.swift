@@ -246,111 +246,170 @@ struct RegistrationView: View {
     }
     
     private func registerUser() {
-            guard validateForm() else { return }
-            
-            isLoading = true
-            fieldErrors = [:]
-            serverError = nil
-            
-            let registerData: [String: Any] = [
-                "firstName": firstName,
-                "lastName": lastName,
-                "email": email,
-                "phone": phoneNumber,
-                "birthDate": birthDate,
-                "password": password,
-                "role": role
-            ]
-            
-            guard let url = URL(string: "http://localhost:3000/api/users/register/") else {
-                showAlert(title: "Ошибка", message: "Неверный URL сервера", isSuccess: false)
-                isLoading = false
-                return
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: registerData)
-            } catch {
-                showAlert(title: "Ошибка", message: "Ошибка формирования данных", isSuccess: false)
-                isLoading = false
-                return
-            }
-            
-            URLSession.shared.dataTask(with: request) { data, response, error in
-                DispatchQueue.main.async {
-                    isLoading = false
-                    
-                    if let error = error {
-                        serverError = "Ошибка сети: \(error.localizedDescription)"
-                        return
-                    }
-                    
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        serverError = "Неверный ответ сервера"
-                        return
-                    }
-                    
-                    print("Status code:", httpResponse.statusCode)
-                    
-                    guard let data = data else {
-                        serverError = "Пустой ответ от сервера"
-                        return
-                    }
-                    
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        print("Response:", responseString)
-                    }
-                    
-                    do {
-                        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                        
-                        if httpResponse.statusCode == 201 {
-                            showAlert(title: "Успешно", message: "Регистрация завершена!", isSuccess: true)
-                        } else {
-                            if let errorMessage = json?["error"] as? String {
-                                serverError = errorMessage
-                            } else if let message = json?["message"] as? String {
-                                serverError = message
-                            } else {
-                                serverError = "Неизвестная ошибка сервера (код \(httpResponse.statusCode))"
-                            }
-                        }
-                    } catch {
-                        serverError = "Ошибка обработки ответа сервера"
-                        print("Error parsing response:", error)
-                    }
-                }
-            }.resume()
+        guard validateForm() else { return }
+        
+        isLoading = true
+        fieldErrors = [:]
+        serverError = nil
+        
+        // Форматирование даты в ISO8601 (YYYY-MM-DD)
+        let isoDateFormatter = DateFormatter()
+        isoDateFormatter.dateFormat = "yyyy-MM-dd"
+        let formattedBirthDate: String
+        
+        if let date = DateFormatter.birthDateFormatter.date(from: birthDate) {
+            formattedBirthDate = isoDateFormatter.string(from: date)
+        } else {
+            showAlert(title: "Ошибка", message: "Неверный формат даты рождения", isSuccess: false)
+            isLoading = false
+            return
         }
-    
-    private func handleServerResponse(data: Data, statusCode: Int) {
+        
+        let registerData: [String: Any] = [
+            "firstName": firstName.trimmingCharacters(in: .whitespaces),
+            "lastName": lastName.trimmingCharacters(in: .whitespaces),
+            "email": email.trimmingCharacters(in: .whitespaces).lowercased(),
+            "phone": phoneNumber.trimmingCharacters(in: .whitespaces),
+            "birthDate": formattedBirthDate,
+            "password": password,
+            "role": role.lowercased()
+        ]
+        
+        guard let url = URL(string: "http://localhost:3000/api/users/register") else {
+            showAlert(title: "Ошибка", message: "Неверный URL сервера", isSuccess: false)
+            isLoading = false
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
         do {
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            
-            if let errors = json?["errors"] as? [[String: String]] {
-                var errorDict = [String: String]()
-                for error in errors {
-                    if let field = error["param"], let msg = error["msg"] {
-                        errorDict[field] = msg
-                    }
-                }
-                fieldErrors = errorDict
+            request.httpBody = try JSONSerialization.data(withJSONObject: registerData, options: [])
+            print("Request body:", String(data: request.httpBody!, encoding: .utf8) ?? "nil")
+        } catch {
+            showAlert(title: "Ошибка", message: "Ошибка формирования данных: \(error.localizedDescription)", isSuccess: false)
+            isLoading = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isLoading = false
                 
-                if errorDict.isEmpty {
-                    serverError = json?["message"] as? String ?? "Неизвестная ошибка сервера"
+                if let error = error {
+                    serverError = "Ошибка сети: \(error.localizedDescription)"
+                    return
                 }
-            } else if let message = json?["message"] as? String {
-                serverError = message
-            } else {
-                serverError = "Ошибка сервера (код \(statusCode))"
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    serverError = "Неверный ответ сервера"
+                    return
+                }
+                
+                print("Status code:", httpResponse.statusCode)
+                
+                guard let data = data else {
+                    serverError = "Пустой ответ от сервера"
+                    return
+                }
+                
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Raw response:", responseString)
+                }
+                
+                if httpResponse.statusCode == 201 {
+                    // Успешная регистрация
+                    self.handleSuccessfulRegistration(data: data)
+                } else {
+                    // Ошибка
+                    self.handleErrorResponse(data: data, statusCode: httpResponse.statusCode)
+                }
+            }
+        }.resume()
+    }
+
+    private func handleSuccessfulRegistration(data: Data) {
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("Registration success:", json)
+                
+                self.loginAfterRegistration()
             }
         } catch {
-            serverError = "Ошибка обработки ответа сервера"
-            print("Error parsing response:", error)
+            print("Error parsing success response:", error)
+            showAlert(title: "Успешно", message: "Регистрация завершена!", isSuccess: true)
+        }
+    }
+
+    private func loginAfterRegistration() {
+        let loginData: [String: Any] = [
+            "email": email.trimmingCharacters(in: .whitespaces).lowercased(),
+            "password": password
+        ]
+        
+        guard let url = URL(string: "http://localhost:3000/api/users/login") else {
+            showAlert(title: "Успешно", message: "Регистрация завершена! Пожалуйста, войдите.", isSuccess: true)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: loginData, options: [])
+        } catch {
+            showAlert(title: "Успешно", message: "Регистрация завершена! Пожалуйста, войдите.", isSuccess: true)
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                   let data = data,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let token = json["token"] as? String {
+                    
+                    // Сохраняем токен (например, в Keychain или UserDefaults)
+                    UserDefaults.standard.set(token, forKey: "authToken")
+                    
+                    // Переходим в профиль
+                    self.showAlert(title: "Успешно", message: "Добро пожаловать!", isSuccess: true)
+                } else {
+                    self.showAlert(title: "Успешно", message: "Регистрация завершена! Пожалуйста, войдите.", isSuccess: true)
+                }
+            }
+        }.resume()
+    }
+
+    private func handleErrorResponse(data: Data, statusCode: Int) {
+        do {
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("Error response:", json)
+                
+                if let errors = json["errors"] as? [[String: String]] {
+                    var errorDict = [String: String]()
+                    for error in errors {
+                        if let field = error["param"], let msg = error["msg"] {
+                            errorDict[field] = msg
+                        }
+                    }
+                    fieldErrors = errorDict
+                    
+                    if errorDict.isEmpty, let message = json["message"] as? String {
+                        serverError = message
+                    }
+                } else if let errorMessage = json["error"] as? String {
+                    serverError = errorMessage
+                } else {
+                    serverError = "Ошибка сервера (код \(statusCode))"
+                }
+            }
+        } catch {
+            print("Error parsing error response:", error)
+            serverError = "Неизвестная ошибка сервера (код \(statusCode))"
         }
     }
     
@@ -413,6 +472,14 @@ extension String {
         let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
         return emailPredicate.evaluate(with: self)
     }
+}
+
+extension DateFormatter {
+    static let birthDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yyyy"
+        return formatter
+    }()
 }
 
 struct RegistrationView_Previews: PreviewProvider {
