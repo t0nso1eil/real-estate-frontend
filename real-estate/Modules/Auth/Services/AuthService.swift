@@ -2,7 +2,7 @@ import Foundation
 
 class AuthService {
     static let shared = AuthService()
-    private let baseURL = "http://your-backend-url.com/api"
+    private let baseURL = "http://localhost:3000/api"
     
     func register(name: String, email: String, password: String, completion: @escaping (Result<User, Error>) -> Void) {
         let url = URL(string: "\(baseURL)/users/register")!

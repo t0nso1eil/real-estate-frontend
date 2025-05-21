@@ -19,13 +19,25 @@ class PropertyService: PropertyServiceProtocol {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, _) = try await URLSession.shared.data(for: request)
-                do {
+        
+        do {
             let decoder = JSONDecoder()
-            return try decoder.decode([Property].self, from: data)
+            if let properties = try? decoder.decode([Property].self, from: data) {
+                return properties
+            }
+            else if let response = try? decoder.decode(PropertyResponse.self, from: data) {
+                return response.properties
+            }
+            else {
+                throw PropertyError.decodingError(message: "Invalid response format")
+            }
         } catch {
             throw handleDecodingError(error as! DecodingError)
-
         }
+    }
+
+    struct PropertyResponse: Decodable {
+        let properties: [Property]
     }
     
     
@@ -41,7 +53,7 @@ class PropertyService: PropertyServiceProtocol {
         case .valueNotFound(_, let context):
             message = "Отсутствует значение: \(context.debugDescription)"
         case .typeMismatch(let type, let context):
-            message = "Тип не совпадает (\(type)): \(context.debugDescription)" //кидается при ошибке авторизации......
+            message = "Тип не совпадает (\(type)): \(context.debugDescription)" 
         @unknown default:
             message = "Неизвестная ошибка декодирования"
         }

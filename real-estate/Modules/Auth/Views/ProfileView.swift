@@ -1,105 +1,126 @@
-//
-//  ProfileView.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 17.05.2025.
-//
-
-// ProfileView.swift
 import SwiftUI
 
 struct ProfileView: View {
-    @State private var user: User? = User.mock
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.presentationMode) var presentationMode
     @State private var showingLogoutAlert = false
     
+    private var fullName: String {
+        guard let user = authManager.currentUser else { return "" }
+        if let lastName = user.lastName {
+            return "\(user.name) \(lastName)"
+        }
+        return user.name
+    }
+    
+    private var roleDescription: String {
+        guard let role = authManager.currentUser?.role else { return "Пользователь" }
+        switch role.lowercased() {
+        case "landlord": return "Арендодатель"
+        case "tenant": return "Арендатор"
+        case "admin": return "Администратор"
+        default: return "Пользователь"
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Заголовок
-                HStack {
-                    Text("Личный кабинет")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                
-                // Профиль пользователя
-                VStack(spacing: 16) {
-                    if let user = user {
-                        // Аватар
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 80, height: 80)
-                            .foregroundColor(.primaryBlue)
-                        
-                        // Информация
-                        VStack(spacing: 4) {
-                            Text(user.name)
-                                .font(.title3)
-                                .fontWeight(.semibold)
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Заголовок
+                    HStack {
+                        Text("Личный кабинет")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    
+                    // Информация о пользователе
+                    if let user = authManager.currentUser {
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 80, height: 80)
+                                .foregroundColor(.blue)
                             
-                            Text(user.email)
-                                .font(.subheadline)
-                                .foregroundColor(.secondaryText)
+                            VStack(spacing: 4) {
+                                Text(fullName)
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                
+                                Text(user.email)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                Text(roleDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 16)
                     }
+                    
+                    // Меню
+                    VStack(spacing: 0) {
+                        MenuItem(icon: "list.bullet.rectangle", title: "Мои бронирования") {
+                            // Действие для бронирований
+                        }
+                        
+                        Divider().padding(.leading, 56)
+                        
+                        MenuItem(icon: "heart", title: "Избранное") {
+                            // Действие для избранного
+                        }
+                        
+                        Divider().padding(.leading, 56)
+                        
+                        MenuItem(icon: "gearshape", title: "Настройки") {
+                            // Действие для настроек
+                        }
+                        
+                        Divider().padding(.leading, 56)
+                        
+                        MenuItem(
+                            icon: "arrow.right.square",
+                            title: "Выход",
+                            action: { showingLogoutAlert = true },
+                            isDestructive: true
+                        )
+                    }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-                .background(Color.lightBackground)
-                .cornerRadius(12)
-                .padding(.horizontal, 16)
-                
-                // Меню
-                VStack(spacing: 0) {
-                    MenuItem(icon: "list.bullet.rectangle", title: "Мои бронирования") {
-                        // Переход к бронированиям
-                    }
-                    
-                    Divider()
-                        .padding(.leading, 56)
-                    
-                    MenuItem(icon: "heart", title: "Избранное") {
-                        // Переход к избранному
-                    }
-                    
-                    Divider()
-                        .padding(.leading, 56)
-                    
-                    MenuItem(icon: "gearshape", title: "Настройки") {
-                        // Переход к настройкам
-                    }
-                    
-                    Divider()
-                        .padding(.leading, 56)
-                    
-                    MenuItem(icon: "arrow.right.square", title: "Выход", action:  {
-                        showingLogoutAlert = true
-                    }, isDestructive: true)
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                .padding(.bottom, 16)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitle("", displayMode: .inline)
+            .navigationBarHidden(true)
+            .alert(isPresented: $showingLogoutAlert) {
+                Alert(
+                    title: Text("Выход"),
+                    message: Text("Вы уверены, что хотите выйти из аккаунта?"),
+                    primaryButton: .destructive(Text("Выйти")) {
+                        authManager.logout()
+                        // Возвращаемся на предыдущий экран после выхода
+                        presentationMode.wrappedValue.dismiss()
+                    },
+                    secondaryButton: .cancel()
                 )
-                .padding(.horizontal, 16)
             }
         }
-        .background(Color(.systemGroupedBackground))
-        .alert(isPresented: $showingLogoutAlert) {
-            Alert(
-                title: Text("Выход"),
-                message: Text("Вы уверены, что хотите выйти из аккаунта?"),
-                primaryButton: .destructive(Text("Выйти")) {
-                    // Обработка выхода
-                },
-                secondaryButton: .cancel()
-            )
-        }
+        .navigationViewStyle(.stack)
     }
 }
 
@@ -114,11 +135,11 @@ struct MenuItem: View {
             HStack(spacing: 16) {
                 Image(systemName: icon)
                     .frame(width: 24, height: 24)
-                    .foregroundColor(isDestructive ? .red : .primaryBlue)
+                    .foregroundColor(isDestructive ? .red : .blue)
                 
                 Text(title)
                     .font(.system(size: 16))
-                    .foregroundColor(isDestructive ? .red : .mainText)
+                    .foregroundColor(isDestructive ? .red : .primary)
                 
                 Spacer()
                 
@@ -130,5 +151,15 @@ struct MenuItem: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        let authManager = AuthManager()
+        authManager.currentUser = User.mock
+        
+        return ProfileView()
+            .environmentObject(authManager)
     }
 }

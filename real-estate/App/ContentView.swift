@@ -1,4 +1,4 @@
-/* import SwiftUI
+import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authManager = AuthManager()
@@ -9,7 +9,7 @@ struct ContentView: View {
                 ProfileView()
                     .environmentObject(authManager)
             } else {
-                SelectRoleView()
+                PredAuthView()
                     .environmentObject(authManager)
             }
         }
@@ -22,14 +22,13 @@ struct ContentView: View {
 
 class AuthManager: ObservableObject {
     @Published var isAuthenticated = false
-    @Published var user: User?
+    @Published var currentUser: User?
     @Published var authToken: String?
     
     func login(user: User, token: String) {
-        self.user = user
+        self.currentUser = user
         self.authToken = token
         self.isAuthenticated = true
-        // Сохраняем в UserDefaults или Keychain
         UserDefaults.standard.set(token, forKey: "authToken")
         if let userData = try? JSONEncoder().encode(user) {
             UserDefaults.standard.set(userData, forKey: "currentUser")
@@ -37,10 +36,9 @@ class AuthManager: ObservableObject {
     }
     
     func logout() {
-        self.user = nil
+        self.currentUser = nil
         self.authToken = nil
         self.isAuthenticated = false
-        // Удаляем из UserDefaults
         UserDefaults.standard.removeObject(forKey: "authToken")
         UserDefaults.standard.removeObject(forKey: "currentUser")
     }
@@ -49,10 +47,9 @@ class AuthManager: ObservableObject {
         if let token = UserDefaults.standard.string(forKey: "authToken"),
            let userData = UserDefaults.standard.data(forKey: "currentUser"),
            let user = try? JSONDecoder().decode(User.self, from: userData) {
-            self.user = user
+            self.currentUser = user
             self.authToken = token
             self.isAuthenticated = true
         }
     }
 }
-*/

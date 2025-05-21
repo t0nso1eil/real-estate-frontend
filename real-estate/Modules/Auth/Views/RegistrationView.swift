@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RegistrationView: View {
+    @EnvironmentObject var authManager: AuthManager
     let role: String
     @Environment(\.presentationMode) var presentationMode
     
@@ -51,14 +52,12 @@ struct RegistrationView: View {
                                 .font(.system(size: 40, weight: .heavy))
                                 .fontWeight(.black)
                                 .foregroundColor(.black)
-                                .alignmentGuide(.top) { d in d[.bottom] - 25 }
                             
                             HStack {
                                 Spacer()
                                 Image("logo")
                                     .resizable()
                                     .frame(width: 51, height: 51)
-                                    .alignmentGuide(.top) { d in d[.bottom] - 25.5 }
                                     .offset(x: -20)
                             }
                         }
@@ -163,7 +162,7 @@ struct RegistrationView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 32)
                         
-                        NavigationLink(destination: LoginView()) {
+                        NavigationLink(destination: LoginView().environmentObject(authManager)) {
                             Text("Уже есть аккаунт? Войти здесь")
                                 .font(.system(size: 16))
                                 .foregroundColor(.gray)
@@ -236,7 +235,7 @@ struct RegistrationView: View {
             }
             .background(
                 NavigationLink(
-                    destination: ProfileView(),
+                    destination: ProfileView().environmentObject(authManager),
                     isActive: $navigateToProfile,
                     label: { EmptyView() }
                 )
@@ -244,7 +243,7 @@ struct RegistrationView: View {
         }
         .navigationViewStyle(.stack)
     }
-    
+        
     private func registerUser() {
         guard validateForm() else { return }
         
@@ -252,7 +251,6 @@ struct RegistrationView: View {
         fieldErrors = [:]
         serverError = nil
         
-        // Форматирование даты в ISO8601 (YYYY-MM-DD)
         let isoDateFormatter = DateFormatter()
         isoDateFormatter.dateFormat = "yyyy-MM-dd"
         let formattedBirthDate: String
@@ -287,7 +285,6 @@ struct RegistrationView: View {
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: registerData, options: [])
-            print("Request body:", String(data: request.httpBody!, encoding: .utf8) ?? "nil")
         } catch {
             showAlert(title: "Ошибка", message: "Ошибка формирования данных: \(error.localizedDescription)", isSuccess: false)
             isLoading = false
@@ -308,33 +305,24 @@ struct RegistrationView: View {
                     return
                 }
                 
-                print("Status code:", httpResponse.statusCode)
-                
                 guard let data = data else {
                     serverError = "Пустой ответ от сервера"
                     return
                 }
                 
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw response:", responseString)
-                }
-                
                 if httpResponse.statusCode == 201 {
-                    // Успешная регистрация
                     self.handleSuccessfulRegistration(data: data)
                 } else {
-                    // Ошибка
                     self.handleErrorResponse(data: data, statusCode: httpResponse.statusCode)
                 }
             }
         }.resume()
     }
-
+    
     private func handleSuccessfulRegistration(data: Data) {
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 print("Registration success:", json)
-                
                 self.loginAfterRegistration()
             }
         } catch {
@@ -342,7 +330,7 @@ struct RegistrationView: View {
             showAlert(title: "Успешно", message: "Регистрация завершена!", isSuccess: true)
         }
     }
-
+    
     private func loginAfterRegistration() {
         let loginData: [String: Any] = [
             "email": email.trimmingCharacters(in: .whitespaces).lowercased(),
@@ -368,27 +356,29 @@ struct RegistrationView: View {
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
-                   let data = data,
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let token = json["token"] as? String {
-                    
-                    // Сохраняем токен (например, в Keychain или UserDefaults)
-                    UserDefaults.standard.set(token, forKey: "authToken")
-                    
-                    // Переходим в профиль
-                    self.showAlert(title: "Успешно", message: "Добро пожаловать!", isSuccess: true)
+                   let data = data {
+                    do {
+                        let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
+                        let user = User(from: authResponse.finalUser)
+                        
+                        // Save authentication data
+                        authManager.login(user: user, token: authResponse.token)
+                        
+                        self.showAlert(title: "Успешно", message: "Добро пожаловать, \(user.name)!", isSuccess: true)
+                    } catch {
+                        print("Error parsing login response:", error)
+                        self.showAlert(title: "Успешно", message: "Регистрация завершена! Пожалуйста, войдите.", isSuccess: true)
+                    }
                 } else {
                     self.showAlert(title: "Успешно", message: "Регистрация завершена! Пожалуйста, войдите.", isSuccess: true)
                 }
             }
         }.resume()
     }
-
+    
     private func handleErrorResponse(data: Data, statusCode: Int) {
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("Error response:", json)
-                
                 if let errors = json["errors"] as? [[String: String]] {
                     var errorDict = [String: String]()
                     for error in errors {
@@ -484,6 +474,8 @@ extension DateFormatter {
 
 struct RegistrationView_Previews: PreviewProvider {
     static var previews: some View {
-        RegistrationView(role: "tenant")
+        let authManager = AuthManager()
+        return RegistrationView(role: "tenant")
+            .environmentObject(authManager)
     }
 }
