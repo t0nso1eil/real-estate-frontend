@@ -174,50 +174,50 @@ struct PropertyView: View {
     }
     
     private func applyFilters() {
-           filteredProperties = properties.filter { property in
-               // Фильтр по типу
-               let typeMatch = selectedTypes.isEmpty || selectedTypes.contains(property.propertyType)
-               
-               // Фильтр по цене
-               let priceMatch = (property.numericPrice >= currentMinPrice) &&
-                               (property.numericPrice <= currentMaxPrice)
-               
-               // Фильтр по поиску
-               let searchMatch = searchText.isEmpty ||
-                                property.title.localizedCaseInsensitiveContains(searchText) ||
-                                property.location.localizedCaseInsensitiveContains(searchText) ||
-                                property.description.localizedCaseInsensitiveContains(searchText)
-               
-               return typeMatch && priceMatch && searchMatch
-           }
-       }
+            filteredProperties = properties.filter { property in
+                let typeMatch = selectedTypes.isEmpty || selectedTypes.contains(property.propertyType)
+                let priceMatch = property.price >= currentMinPrice && property.price <= currentMaxPrice
+                let searchMatch = searchText.isEmpty ||
+                                 property.title.localizedCaseInsensitiveContains(searchText) ||
+                                 property.location.localizedCaseInsensitiveContains(searchText)
+                return typeMatch && priceMatch && searchMatch
+            }
+        }
     
     private func loadProperties() async {
             isLoading = true
             errorMessage = nil
             
-        do {
-                  
-            let decodedData = try await propertyService.fetchProperties()
-                    
-                    await MainActor.run {
-                        self.properties = decodedData
-                        
-                        if !decodedData.isEmpty {
-                                           let prices = decodedData.map { $0.numericPrice }
-                                           self.minPrice = prices.min() ?? 0
-                                           self.maxPrice = prices.max() ?? 0
-                                           self.currentMinPrice = self.minPrice
-                                           self.currentMaxPrice = self.maxPrice
-                                       }
-                        self.filteredProperties = decodedData
-                        self.isLoading = false
-                    }
-                } catch {
-                    await handleError(error)
-                    self.isLoading = false
+            do {
+                let properties = try await propertyService.fetchProperties()
+                print("Successfully loaded \(properties.count) properties")
+                properties.forEach { print($0) }
+                
+                await MainActor.run {
+                    self.properties = properties
+                    self.filteredProperties = properties
+                    updatePriceRange()
+                }
+            } catch {
+                print("Loading error: \(error)")
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
                 }
             }
+            
+            isLoading = false
+        }
+    
+    private func updatePriceRange() {
+            let prices = properties.map { $0.safePrice }
+            let min = prices.min() ?? 0
+            let max = prices.max() ?? (min + 10000)
+            
+            self.minPrice = min
+            self.maxPrice = max > min ? max : min + 10000
+            self.currentMinPrice = min
+            self.currentMaxPrice = max > min ? max : min + 10000
+        }
     
     func handleError(_ error: any Error) async {
         await MainActor.run {
@@ -238,4 +238,3 @@ struct PropertyView_Previews: PreviewProvider {
         PropertyView()
     }
 }
-

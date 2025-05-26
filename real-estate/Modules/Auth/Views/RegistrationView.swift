@@ -361,7 +361,6 @@ struct RegistrationView: View {
                         let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
                         let user = User(from: authResponse.finalUser)
                         
-                        // Save authentication data
                         authManager.login(user: user, token: authResponse.token)
                         
                         self.showAlert(title: "Успешно", message: "Добро пожаловать, \(user.name)!", isSuccess: true)

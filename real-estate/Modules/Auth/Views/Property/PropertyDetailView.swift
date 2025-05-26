@@ -19,7 +19,7 @@ struct PropertyDetailView: View {
                         .fontWeight(.bold)
 
                     HStack {
-                        Text("\(Int(property.numericPrice)) ₽/мес")
+                        Text("\(Int(property.price)) ₽/мес")
                             .font(.title2)
                             .foregroundColor(.blue)
 

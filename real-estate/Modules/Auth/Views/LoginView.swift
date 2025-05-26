@@ -12,6 +12,10 @@ struct LoginView: View {
     @State private var alertMessage: String = ""
     @State private var fieldErrors: [String: String] = [:]
     
+    struct APIError: Error, Decodable {
+            let message: String
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -20,6 +24,7 @@ struct LoginView: View {
                 
                 ScrollView {
                     VStack(spacing: 0) {
+                        // Логотип и заголовок
                         ZStack(alignment: .center) {
                             Text("Realstate")
                                 .font(.system(size: 40, weight: .heavy))
@@ -38,7 +43,9 @@ struct LoginView: View {
                         .padding(.top, 60)
                         .padding(.horizontal, 16)
                         
+                        // Поля ввода
                         VStack(spacing: 16) {
+                            // Email поле
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Email")
                                     .font(.system(size: 14))
@@ -49,6 +56,7 @@ struct LoginView: View {
                                     .keyboardType(.emailAddress)
                                     .autocapitalization(.none)
                                     .disableAutocorrection(true)
+                                    .textContentType(.username)
                                 
                                 if let error = fieldErrors["email"] {
                                     Text(error)
@@ -57,6 +65,7 @@ struct LoginView: View {
                                 }
                             }
                             
+                            // Пароль поле
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Пароль")
                                     .font(.system(size: 14))
@@ -88,6 +97,7 @@ struct LoginView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 40)
                         
+                        // Кнопка входа
                         Button(action: loginUser) {
                             if isLoading {
                                 ProgressView()
@@ -106,6 +116,7 @@ struct LoginView: View {
                         .padding(.top, 40)
                         .disabled(isLoading)
                         
+                        // Дополнительные ссылки
                         Button(action: {}) {
                             Text("Забыли пароль?")
                                 .font(.system(size: 16))
@@ -113,6 +124,7 @@ struct LoginView: View {
                         }
                         .padding(.top, 16)
                         
+                        // Разделитель
                         HStack {
                             Color(red: 0.2, green: 0.2, blue: 0.2)
                                 .frame(height: 1)
@@ -128,6 +140,7 @@ struct LoginView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
                         
+                        // Социальные кнопки
                         VStack(spacing: 16) {
                             Button(action: {}) {
                                 HStack {
@@ -174,6 +187,9 @@ struct LoginView: View {
                     dismissButton: .default(Text("OK"))
                 )
             }
+            .onAppear {
+                UITextField.appearance().clearButtonMode = .whileEditing
+            }
         }
         .navigationViewStyle(.stack)
     }
@@ -190,7 +206,13 @@ struct LoginView: View {
                 
                 switch result {
                 case .success(let authResponse):
-                    let user = User(from: authResponse.finalUser)
+                    let user = User(
+                        id: authResponse.finalUser.id,
+                        name: authResponse.finalUser.name,
+                        email: authResponse.finalUser.email,
+                        role: authResponse.finalUser.role,
+                        lastName: authResponse.finalUser.lastName
+                    )
                     authManager.login(user: user, token: authResponse.token)
                     presentationMode.wrappedValue.dismiss()
                     
@@ -226,17 +248,19 @@ struct LoginView: View {
     }
     
     private func handleLoginError(_ error: Error) {
-        if let authError = error as? URLError {
-            alertMessage = "Ошибка сети: \(authError.localizedDescription)"
-        } else if let decodingError = error as? DecodingError {
-            alertMessage = "Ошибка обработки ответа сервера"
-            print("Decoding error:", decodingError)
-        } else {
-            alertMessage = error.localizedDescription
+            if let authError = error as? URLError {
+                alertMessage = "Ошибка сети: \(authError.localizedDescription)"
+            } else if let decodingError = error as? DecodingError {
+                print("Decoding error details:", decodingError)
+                alertMessage = "Ошибка обработки данных. Пожалуйста, попробуйте позже."
+            } else if let apiError = error as? APIError {
+                alertMessage = apiError.message
+            } else {
+                alertMessage = error.localizedDescription
+            }
+            
+            showAlert = true
         }
-        
-        showAlert = true
-    }
 }
 
 struct LoginView_Previews: PreviewProvider {

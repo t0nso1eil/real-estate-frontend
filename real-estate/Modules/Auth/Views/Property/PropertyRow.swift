@@ -2,11 +2,20 @@ import SwiftUI
 
 struct PropertyRow: View {
     let property: Property
+    
+    private var formattedPrice: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencySymbol = "₽"
+        formatter.maximumFractionDigits = 0
+        formatter.locale = Locale(identifier: "ru_RU")
+        
+        return formatter.string(from: NSNumber(value: property.safePrice)) ?? "\(Int(property.safePrice)) ₽"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Заглушка для изображения (замените на реальное изображение)
-            Image("apart1")  // Используем имя из Assets
+            Image("apart1")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(height: 200)
@@ -32,8 +41,8 @@ struct PropertyRow: View {
                     .font(.system(size: 16, weight: .semibold))
                     .lineLimit(1)
 
-                // Цена (крупно)
-                Text(property.numericPrice.formatted(.currency(code: "RUB")))
+                // Цена (крупно) с рублями
+                Text(formattedPrice)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.blue)
 

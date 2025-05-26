@@ -24,10 +24,9 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Заголовок
                     HStack {
                         Text("Личный кабинет")
                             .font(.title)
@@ -37,7 +36,6 @@ struct ProfileView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
                     
-                    // Информация о пользователе
                     if let user = authManager.currentUser {
                         VStack(spacing: 16) {
                             Image(systemName: "person.circle.fill")
@@ -67,32 +65,49 @@ struct ProfileView: View {
                         .padding(.horizontal, 16)
                     }
                     
-                    // Меню
                     VStack(spacing: 0) {
-                        MenuItem(icon: "list.bullet.rectangle", title: "Мои бронирования") {
-                            // Действие для бронирований
-                        }
+                        MenuItem(
+                            icon: "list.bullet.rectangle",
+                            title: "Мои бронирования",
+                            destination: EmptyView()
+                        )
                         
                         Divider().padding(.leading, 56)
                         
-                        MenuItem(icon: "heart", title: "Избранное") {
-                            // Действие для избранного
-                        }
-                        
-                        Divider().padding(.leading, 56)
-                        
-                        MenuItem(icon: "gearshape", title: "Настройки") {
-                            // Действие для настроек
+                        NavigationLink(destination: PropertyView()) {
+                            MenuItemContent(
+                                icon: "house.fill",
+                                title: "Недвижимость",
+                                isDestructive: false
+                            )
                         }
                         
                         Divider().padding(.leading, 56)
                         
                         MenuItem(
-                            icon: "arrow.right.square",
-                            title: "Выход",
-                            action: { showingLogoutAlert = true },
-                            isDestructive: true
+                            icon: "heart",
+                            title: "Избранное",
+                            destination: EmptyView()
                         )
+                        
+                        Divider().padding(.leading, 56)
+                        
+                        MenuItem(
+                            icon: "gearshape",
+                            title: "Настройки",
+                            destination: EmptyView()
+                        )
+                        
+                        Divider().padding(.leading, 56)
+                        
+                        Button(action: { showingLogoutAlert = true }) {
+                            MenuItemContent(
+                                icon: "arrow.right.square",
+                                title: "Выход",
+                                isDestructive: true
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .background(Color(.systemBackground))
                     .cornerRadius(12)
@@ -113,44 +128,56 @@ struct ProfileView: View {
                     message: Text("Вы уверены, что хотите выйти из аккаунта?"),
                     primaryButton: .destructive(Text("Выйти")) {
                         authManager.logout()
-                        // Возвращаемся на предыдущий экран после выхода
                         presentationMode.wrappedValue.dismiss()
                     },
                     secondaryButton: .cancel()
                 )
             }
         }
-        .navigationViewStyle(.stack)
     }
 }
 
-struct MenuItem: View {
+struct MenuItem<Destination: View>: View {
     let icon: String
     let title: String
-    let action: () -> Void
+    let destination: Destination
     var isDestructive: Bool = false
     
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .frame(width: 24, height: 24)
-                    .foregroundColor(isDestructive ? .red : .blue)
-                
-                Text(title)
-                    .font(.system(size: 16))
-                    .foregroundColor(isDestructive ? .red : .primary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray.opacity(0.5))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .contentShape(Rectangle())
+        NavigationLink(destination: destination) {
+            MenuItemContent(
+                icon: icon,
+                title: title,
+                isDestructive: isDestructive
+            )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct MenuItemContent: View {
+    let icon: String
+    let title: String
+    let isDestructive: Bool
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .frame(width: 24, height: 24)
+                .foregroundColor(isDestructive ? .red : .blue)
+            
+            Text(title)
+                .font(.system(size: 16))
+                .foregroundColor(isDestructive ? .red : .primary)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .foregroundColor(.gray.opacity(0.5))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .contentShape(Rectangle())
     }
 }
 
