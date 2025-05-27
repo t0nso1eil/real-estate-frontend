@@ -1,19 +1,18 @@
 import SwiftUI
 
 struct CreateBookingRequestView: View {
+    @EnvironmentObject var authManager: AuthManager
     @Environment(\.presentationMode) var presentationMode
     let property: Property
     
-    // Состояние формы
     @State private var requestedStartDate = Date()
-    @State private var requestedEndDate = Date().addingTimeInterval(86400) // +1 день
+    @State private var requestedEndDate = Date().addingTimeInterval(86400)
     @State private var isLoading = false
-    @State private var showAlert = false
-    @State private var alertTitle = ""
-    @State private var alertMessage = ""
-    @State private var shouldDismiss = false
+    @State private var alertItem: AlertItem?
     
-    private let bookingService = BookingService()
+    private var bookingService: BookingService {
+        BookingService(authManager: authManager)
+    }
     
     var body: some View {
         NavigationView {
@@ -47,15 +46,15 @@ struct CreateBookingRequestView: View {
             .navigationBarItems(leading: Button("Отмена") {
                 presentationMode.wrappedValue.dismiss()
             })
-            .alert(isPresented: $showAlert) {
+            .alert(item: $alertItem) { item in
                 Alert(
-                    title: Text(alertTitle),
-                    message: Text(alertMessage),
-                    dismissButton: .default(Text("OK")) {
-                        if shouldDismiss {
+                    title: Text(item.title),
+                    message: Text(item.message),
+                    dismissButton: .default(Text("OK"), action: {
+                        if item.shouldDismiss {
                             presentationMode.wrappedValue.dismiss()
                         }
-                    }
+                    })
                 )
             }
         }
@@ -63,7 +62,12 @@ struct CreateBookingRequestView: View {
     
     private func createBookingRequest() {
         guard requestedEndDate > requestedStartDate else {
-            showAlert(title: "Ошибка", message: "Дата выезда должна быть позже даты заезда")
+            showAlert(title: "Ошибка", message: "Дата выезда должна быть позже даты заезда", dismiss: false)
+            return
+        }
+        
+        guard let tenantId = authManager.currentUser?.id else {
+            showAlert(title: "Ошибка", message: "Пользователь не авторизован", dismiss: false)
             return
         }
         
@@ -71,17 +75,14 @@ struct CreateBookingRequestView: View {
         
         Task {
             do {
-                let tenantId = 14
                 let request = BookingRequest(
                     propertyId: property.id,
                     tenantId: tenantId,
-                    requestedStartDate: requestedStartDate,
-                    requestedEndDate: requestedEndDate
+                    startDate: requestedStartDate,
+                    endDate: requestedEndDate
                 )
-                print(request)
                 
                 try await bookingService.createBookingRequest(request)
-                
                 showSuccess()
             } catch {
                 showError(error)
@@ -92,23 +93,29 @@ struct CreateBookingRequestView: View {
     }
     
     private func showSuccess() {
-        alertTitle = "Успешно"
-        alertMessage = "Заявка на бронирование создана"
-        shouldDismiss = true
-        showAlert = true
+        showAlert(title: "Успешно", message: "Заявка на бронирование создана", dismiss: true)
     }
     
     private func showError(_ error: Error) {
-        alertTitle = "Ошибка"
-        alertMessage = error.localizedDescription
-        shouldDismiss = false
-        showAlert = true
+        let message: String
+        
+        if let propertyError = error as? PropertyError {
+            message = propertyError.errorDescription ?? "Неизвестная ошибка"
+        } else {
+            message = error.localizedDescription
+        }
+        
+        showAlert(title: "Ошибка", message: message, dismiss: false)
     }
     
-    private func showAlert(title: String, message: String) {
-        alertTitle = title
-        alertMessage = message
-        shouldDismiss = false
-        showAlert = true
+    private func showAlert(title: String, message: String, dismiss: Bool) {
+        alertItem = AlertItem(title: title, message: message, shouldDismiss: dismiss)
     }
+}
+
+struct AlertItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+    let shouldDismiss: Bool
 }

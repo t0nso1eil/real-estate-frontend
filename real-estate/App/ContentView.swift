@@ -27,6 +27,7 @@ class AuthManager: ObservableObject {
     @Published var currentUser: User?
     @Published var authToken: String?
     
+    static let shared = AuthManager()
     private let tokenKey = "authToken"
     private let userKey = "currentUser"
     
@@ -96,4 +97,9 @@ class AuthManager: ObservableObject {
         // Временно просто возвращаем текущий токен
         completion(true)
     }
+    
+    func getAuthHeader() -> [String: String]? {
+            guard let token = authToken else { return nil }
+            return ["Authorization": "Bearer \(token)"]
+        }
 }

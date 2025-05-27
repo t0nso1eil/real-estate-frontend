@@ -84,11 +84,13 @@ struct ProfileView: View {
                         
                         Divider().padding(.leading, 56)
                         
-                        MenuItem(
-                            icon: "heart",
-                            title: "Избранное",
-                            destination: EmptyView()
-                        )
+                        NavigationLink(destination: FavoritesView()) {
+                            MenuItemContent(
+                                icon: "heart",
+                                title: "Избранное",
+                                isDestructive: false
+                            )
+                        }
                         
                         Divider().padding(.leading, 56)
                         

@@ -1,24 +1,38 @@
 import Foundation
+
 struct BookingRequest: Codable {
-    let property: Int
-    let tenant: Int
-    let requestedStartDate: Date
-    let requestedEndDate: Date
+    let propertyId: Int
+    let tenantId: Int
+    let requestedStartDate: String
+    let requestedEndDate: String
     let status: String
     
     enum CodingKeys: String, CodingKey {
-        case property = "property"  // Сервер ожидает camelCase
-        case tenant = "tenant"
-        case requestedStartDate = "requestedStartDate"
-        case requestedEndDate = "requestedEndDate"
+        case propertyId = "property_id"
+        case tenantId = "tenant_id"
+        case requestedStartDate = "requested_start_date"
+        case requestedEndDate = "requested_end_date"
         case status
     }
     
-    init(propertyId: Int, tenantId: Int, requestedStartDate: Date, requestedEndDate: Date) {
-        self.property = propertyId
-        self.tenant = tenantId
-        self.requestedStartDate = requestedStartDate
-        self.requestedEndDate = requestedEndDate
+    init(propertyId: Int, tenantId: Int, startDate: Date, endDate: Date) {
+        self.propertyId = propertyId
+        self.tenantId = tenantId
+        
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withFullDate] // Только дата без времени
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        self.requestedStartDate = dateFormatter.string(from: startDate)
+        self.requestedEndDate = dateFormatter.string(from: endDate)
         self.status = "created"
     }
+}
+
+struct PropertyReference: Codable {
+    let id: Int
+}
+
+struct TenantReference: Codable {
+    let id: Int
 }
