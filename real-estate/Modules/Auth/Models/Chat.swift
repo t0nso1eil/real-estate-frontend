@@ -1,18 +1,6 @@
-//
-//  Chat.swift
-//  real-estate
-//
-//  Created by катюшка квакушка on 28.05.2025.
-//
-
-
-// Модель чата
-struct Chat: Codable, Identifiable {
+import SwiftUICore
+struct Chat: Identifiable, Codable {
     let id: Int
-    var messages: [Message]
+    let messages: [Message]
     let property: Property
-    let tenant: User
-    let landlord: User
-
-
 }

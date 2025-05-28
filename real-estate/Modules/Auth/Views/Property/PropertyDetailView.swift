@@ -3,6 +3,7 @@ import SwiftUI
 struct PropertyDetailView: View {
     let property: Property
     @State private var showingBookingRequest = false
+    @State private var showingChatView = false
     @State private var ownerDetails: User?
     @State private var isLoadingOwner = false
     @State private var errorMessage: String?
@@ -119,17 +120,22 @@ struct PropertyDetailView: View {
                             Spacer()
                         }
                         
-                        Button(action: {
-                        }) {
-                            Text("Написать")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color(hex: "#0057B8"))
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                        // Кнопка "Написать" с NavigationLink
+                        NavigationLink(destination: ChatView(propertyId: property.id), isActive: $showingChatView) {
+                            Button(action: {
+                                showingChatView = true
+                            }) {
+                                Text("Написать")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color(hex: "#0057B8"))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
                         }
                         
                         Button(action: {
+                            // Действие для жалобы
                         }) {
                             Text("Пожаловаться")
                                 .frame(maxWidth: .infinity)
