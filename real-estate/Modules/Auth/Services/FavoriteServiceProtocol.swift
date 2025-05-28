@@ -76,7 +76,7 @@ class FavoriteService: FavoriteServiceProtocol {
         
         let responses = try JSONDecoder().decode([FavoriteResponse].self, from: data)
         guard let favorite = responses.first(where: { $0.property.id == propertyId }) else {
-            throw PropertyError.notFound
+            throw URLError(.badURL)
         }
         return favorite.id
     }
@@ -152,3 +152,4 @@ class FavoriteService: FavoriteServiceProtocol {
         }
     }
 }
+

@@ -31,56 +31,65 @@ struct SelectRoleView: View {
                         .padding(.horizontal, 16)
                         
                         ZStack(alignment: .top) {
-                            VStack(spacing: 12) {
+                            // Лэндлорд (синий блок)
+                            VStack(spacing: 20) {
                                 Text("Я арендодатель")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.black)
-                                    .frame(width: 150, height: 22)
                                 
-                                ZStack(alignment: .bottom) {
+                                ZStack(alignment: .top) {
                                     RoundedRectangle(cornerRadius: 15)
                                         .fill(Color(red: 0, green: 0.34, blue: 0.72))
                                         .frame(width: 282, height: 110)
+                                        .colorMultiply(selectedRole == "tenant" ? .gray : .white) // Фильтр
                                     
-                                    Button(action: { selectedRole = "landlord" }) {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedRole = "landlord"
+                                        }
+                                    }) {
                                         Image("landlord")
                                             .resizable()
-                                            .frame(width: 136, height: 136)
-                                            .offset(y: 10)
+                                            .frame(width: 140, height: 140)
+                                            .offset(y: -30)
+                                            .colorMultiply(selectedRole == "tenant" ? .gray : .white) // Фильтр
                                     }
-                                    .offset(y: 15)
                                 }
-                                .frame(height: 140)
                             }
                             .offset(x: 90, y: 30)
-                            
+
+                            // Тенант (оранжевый блок)
                             VStack(spacing: 12) {
                                 Text("Я арендатор")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(.black)
-                                    .frame(width: 117, height: 22)
                                 
-                                ZStack(alignment: .bottom) {
+                                ZStack(alignment: .top) {
                                     RoundedRectangle(cornerRadius: 15)
                                         .fill(Color(red: 1.0, green: 0.58, blue: 0.0))
                                         .frame(width: 282, height: 108)
+                                        .colorMultiply(selectedRole == "landlord" ? .gray : .white) // Фильтр
                                     
-                                    Button(action: { selectedRole = "tenant" }) {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            selectedRole = "tenant"
+                                        }
+                                    }) {
                                         Image("tenant")
                                             .resizable()
-                                            .frame(width: 142, height: 142)
-                                            .offset(y: 10)
+                                            .frame(width: 138, height: 138)
+                                            .offset(y: -30)
+                                            .colorMultiply(selectedRole == "landlord" ? .gray : .white) // Фильтр
                                     }
-                                    .offset(y: 15)
                                 }
-                                .frame(height: 140)
                             }
                             .offset(x: -90, y: 180)
                         }
                         .frame(height: 320)
                         .padding(.top, 20)
+
+                        Spacer()
                     
-                    Spacer()
                     
                     VStack(spacing: 16) {
                         if let role = selectedRole {

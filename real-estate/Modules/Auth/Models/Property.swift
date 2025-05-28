@@ -1,4 +1,4 @@
-struct Owner: Decodable {
+struct Owner: Codable {
     let id: Int
     let name: String?
     let email: String?
@@ -6,6 +6,12 @@ struct Owner: Decodable {
     enum CodingKeys: String, CodingKey {
         case id, name, email
     }
+    
+    init(id: Int, name: String?, email: String?) {
+           self.id = id
+           self.name = name
+           self.email = email
+       }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -15,7 +21,7 @@ struct Owner: Decodable {
     }
 }
 
-struct Property: Identifiable, Decodable {
+struct Property: Identifiable, Codable {
     let id: Int
     let title: String
     let description: String
@@ -31,6 +37,26 @@ struct Property: Identifiable, Decodable {
         case createdAt
         case owner
     }
+    
+    init(
+            id: Int,
+            title: String,
+            description: String,
+            price: Double,
+            location: String,
+            propertyType: String,
+            createdAt: String,
+            owner: Owner?
+        ) {
+            self.id = id
+            self.title = title
+            self.description = description
+            self.price = price
+            self.location = location
+            self.propertyType = propertyType
+            self.createdAt = createdAt
+            self.owner = owner
+        }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
