@@ -4,67 +4,133 @@ struct ChatView: View {
     let propertyId: Int
     @State private var chat: Chat?
     @State private var isLoading = false
+    @State private var isLoadingOwner = false
     @State private var errorMessage: String?
     @State private var newMessageText = ""
-    @State private var rawResponse: String = ""
+    @State private var ownerDetails: User?
+    @State private var isCreatingChat = false
     
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        VStack {
-            // Заголовок чата с кнопкой назад
-            HStack {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.blue)
-                }
-                .padding(.leading, 16)
-                
-                Spacer()
-                
-                Text("Чат")
-                    .font(.headline)
-                
-                Spacer()
-            }
-            .padding()
-            
-            // Отображение сырого ответа для отладки
-            if !rawResponse.isEmpty {
-                ScrollView {
-                    Text("Ответ сервера:")
-                        .font(.caption)
-                    Text(rawResponse)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                .frame(height: 100)
-                .padding()
-            }
-            
-            // Основное содержимое чата
-            if isLoading {
-                ProgressView()
-                    .frame(maxHeight: .infinity)
-            } else if let error = errorMessage {
-                VStack {
-                    Text("Ошибка:")
+        VStack(spacing: 0) {
+            // Шапка чата
+            VStack(spacing: 0) {
+                // Кнопка назад и заголовок
+                HStack {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.leading, 16)
+                    
+                    Spacer()
+                    
+                    Text("Чат")
                         .font(.headline)
-                    Text(error)
-                        .foregroundColor(.red)
-                    if let chat = chat {
-                        ChatMessagesView(chat: chat)
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 12)
+                
+                // Информация о владельце и недвижимости
+                if let property = chat?.property, let owner = chat?.property.owner {
+                    HStack(alignment: .top, spacing: 12) {
+                        // Аватар владельца
+                        Image("profile")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 75, height: 75)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                        
+                        // Информация о владельце
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 4) {
+                                if isLoadingOwner {
+                                    ProgressView()
+                                } else {
+                                    Text(ownerDetails?.name ?? owner.name ?? "Не указано")
+                                        .font(.system(size: 18, weight: .bold))
+                                }
+                                
+                                Text("арендодатель")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(Color(hex: "#FA8A00"))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .stroke(Color(hex: "#FA8A00"), lineWidth: 1)
+                                    )
+                            }
+                            
+                            // Карточка с информацией о недвижимости
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(hex: "#0057B8"))
+                                    .frame(height: 55)
+                                
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(property.title)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.white)
+                                        
+                                        Text(property.location)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.white.opacity(0.8))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(Int(property.price)) ₽")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(Color(hex: "#F4F4F4"))
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .onAppear {
+                        fetchOwnerDetails(ownerId: owner.id)
                     }
                 }
-            } else if let chat = chat {
-                ChatMessagesView(chat: chat)
-            } else {
-                Text("Чат не найден")
-                    .frame(maxHeight: .infinity)
             }
+            .background(Color.white)
+            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            
+            // Основное содержимое чата
+            Group {
+                if isLoading || isCreatingChat {
+                    ProgressView()
+                        .frame(maxHeight: .infinity)
+                } else if let error = errorMessage {
+                    VStack {
+                        Text("Произошла ошибка")
+                            .font(.headline)
+                        Text(error)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                    }
+                    .frame(maxHeight: .infinity)
+                } else if let chat = chat {
+                    ChatMessagesView(chat: chat)
+                } else {
+                    Text("Создание чата...")
+                        .frame(maxHeight: .infinity)
+                }
+            }
+            .background(Color(hex: "#F4F4F4"))
             
             // Поле ввода сообщения
             HStack {
@@ -77,12 +143,57 @@ struct ChatView: View {
                 }
             }
             .padding()
+            .background(Color.white)
         }
-        .background(Color(hex: "#F4F4F4"))
         .navigationBarHidden(true)
         .onAppear {
             fetchOrCreateChat()
         }
+    }
+    
+    private func fetchOwnerDetails(ownerId: Int) {
+        guard authManager.isAuthenticated, let token = authManager.authToken else {
+            errorMessage = "Требуется авторизация"
+            return
+        }
+        
+        isLoadingOwner = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "http://localhost:3000/api/users/\(ownerId)") else {
+            isLoadingOwner = false
+            errorMessage = "Неверный URL"
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                self.isLoadingOwner = false
+                
+                if let error = error {
+                    self.errorMessage = "Ошибка: \(error.localizedDescription)"
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "Нет данных в ответе"
+                    return
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    let decodedResponse = try decoder.decode(User.self, from: data)
+                    self.ownerDetails = decodedResponse
+                } catch {
+                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)"
+                }
+            }
+        }.resume()
     }
     
     private func fetchOrCreateChat() {
@@ -93,7 +204,6 @@ struct ChatView: View {
         
         isLoading = true
         errorMessage = nil
-        rawResponse = ""
         
         fetchChats { chats in
             if let existingChat = chats.first(where: { $0.property.id == self.propertyId }) {
@@ -138,17 +248,13 @@ struct ChatView: View {
                     return
                 }
                 
-                let responseString = String(data: data, encoding: .utf8) ?? "Не удалось конвертировать данные"
-                self.rawResponse = responseString
-                print("GET /api/chats response: \(responseString)")
-                
                 do {
                     let decoder = JSONDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     let chats = try decoder.decode([Chat].self, from: data)
                     completion(chats)
                 } catch {
-                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)\n\nОтвет сервера: \(responseString)"
+                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)"
                 }
             }
         }.resume()
@@ -158,12 +264,17 @@ struct ChatView: View {
         guard let token = authManager.authToken else {
             errorMessage = "Требуется авторизация"
             isLoading = false
+            isCreatingChat = false
             return
         }
+        
+        isCreatingChat = true
+        errorMessage = nil
         
         guard let url = URL(string: "http://localhost:3000/api/chats") else {
             errorMessage = "Неверный URL"
             isLoading = false
+            isCreatingChat = false
             return
         }
         
@@ -179,15 +290,23 @@ struct ChatView: View {
         } catch {
             errorMessage = "Ошибка создания запроса: \(error.localizedDescription)"
             isLoading = false
+            isCreatingChat = false
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { [self] data, response, error in
             DispatchQueue.main.async {
                 self.isLoading = false
+                self.isCreatingChat = false
                 
                 if let error = error {
                     self.errorMessage = "Ошибка сети: \(error.localizedDescription)"
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    self.errorMessage = "Ошибка сервера"
                     return
                 }
                 
@@ -196,17 +315,23 @@ struct ChatView: View {
                     return
                 }
                 
-                let responseString = String(data: data, encoding: .utf8) ?? "Не удалось конвертировать данные"
-                self.rawResponse = responseString
-                print("POST /api/chats response: \(responseString)")
-                
                 do {
                     let decoder = JSONDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
                     let newChat = try decoder.decode(Chat.self, from: data)
                     self.chat = newChat
+                    self.errorMessage = nil
                 } catch {
-                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)\n\nОтвет сервера: \(responseString)"
+                    self.fetchChats { chats in
+                        DispatchQueue.main.async {
+                            if let existingChat = chats.first(where: { $0.property.id == self.propertyId }) {
+                                self.chat = existingChat
+                                self.errorMessage = nil
+                            } else {
+                                self.errorMessage = "Не удалось загрузить чат"
+                            }
+                        }
+                    }
                 }
             }
         }.resume()
@@ -224,11 +349,12 @@ struct ChatMessagesView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 if chat.messages.isEmpty {
                     Text("Нет сообщений")
                         .foregroundColor(.gray)
                         .padding()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ForEach(chat.messages) { message in
                         MessageView(message: message,
@@ -236,8 +362,10 @@ struct ChatMessagesView: View {
                     }
                 }
             }
-            .padding()
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
         }
+        .background(Color(hex: "#F4F4F4"))
     }
 }
 
@@ -253,13 +381,15 @@ struct MessageView: View {
             
             VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
                 Text(message.content)
-                    .padding(10)
-                    .background(isCurrentUser ? Color.blue : Color.gray.opacity(0.2))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isCurrentUser ? Color.blue : Color.white)
                     .foregroundColor(isCurrentUser ? .white : .black)
-                    .cornerRadius(10)
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                 
                 Text(formatDate(message.createdAt))
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundColor(.gray)
             }
             
@@ -267,6 +397,7 @@ struct MessageView: View {
                 Spacer()
             }
         }
+        .padding(.horizontal, 16)
     }
     
     private func formatDate(_ dateString: String) -> String {
@@ -274,7 +405,7 @@ struct MessageView: View {
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
         
         if let date = dateFormatter.date(from: dateString) {
-            dateFormatter.dateFormat = "HH:mm, d MMM"
+            dateFormatter.dateFormat = "HH:mm"
             return dateFormatter.string(from: date)
         }
         
