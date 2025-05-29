@@ -9,9 +9,14 @@ struct ChatView: View {
     @State private var newMessageText = ""
     @State private var ownerDetails: User?
     @State private var isCreatingChat = false
+    @State private var isSendingMessage = false
+    @State private var lastUpdate = Date()
     
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.presentationMode) var presentationMode
+    
+    // Таймер для автоматического обновления чата
+    let timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -121,10 +126,17 @@ struct ChatView: View {
                             .foregroundColor(.red)
                             .multilineTextAlignment(.center)
                             .padding()
+                        Button("Повторить") {
+                            fetchOrCreateChat()
+                        }
                     }
                     .frame(maxHeight: .infinity)
                 } else if let chat = chat {
-                    ChatMessagesView(chat: chat)
+                    ChatMessagesView(
+                        chat: chat,
+                        currentUserId: authManager.currentUser?.id,
+                        onRefresh: refreshChat
+                    )
                 } else {
                     Text("Создание чата...")
                         .frame(maxHeight: .infinity)
@@ -136,10 +148,16 @@ struct ChatView: View {
             HStack {
                 TextField("Написать сообщение...", text: $newMessageText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .disabled(isSendingMessage)
                 
-                Button(action: sendMessage) {
-                    Image(systemName: "paperplane.fill")
-                        .foregroundColor(.blue)
+                if isSendingMessage {
+                    ProgressView()
+                } else {
+                    Button(action: sendMessage) {
+                        Image(systemName: "paperplane.fill")
+                            .foregroundColor(newMessageText.isEmpty ? .gray : .blue)
+                    }
+                    .disabled(newMessageText.isEmpty)
                 }
             }
             .padding()
@@ -149,20 +167,114 @@ struct ChatView: View {
         .onAppear {
             fetchOrCreateChat()
         }
+        .onReceive(timer) { _ in
+            if chat != nil {
+                refreshChat()
+            }
+        }
     }
     
-    private func fetchOwnerDetails(ownerId: Int) {
-        guard authManager.isAuthenticated, let token = authManager.authToken else {
-            errorMessage = "Требуется авторизация"
+    
+    private func sendMessage() {
+        guard let chatId = chat?.id, !newMessageText.isEmpty else {
+            print("Ошибка: chatId = \(chat?.id ?? nil), newMessageText = \(newMessageText)")
             return
         }
         
-        isLoadingOwner = true
-        errorMessage = nil
+        isSendingMessage = true
         
-        guard let url = URL(string: "http://localhost:3000/api/users/\(ownerId)") else {
-            isLoadingOwner = false
+        guard let token = authManager.authToken else {
+            errorMessage = "Требуется авторизация"
+            isSendingMessage = false
+            print("Ошибка: отсутствует токен авторизации")
+            return
+        }
+        
+        let urlString = "http://localhost:3000/api/chats/\(chatId)/message"
+        guard let url = URL(string: urlString) else {
             errorMessage = "Неверный URL"
+            isSendingMessage = false
+            print("Ошибка: неверный URL - \(urlString)")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody = ["content": newMessageText]
+        print("Отправляемые данные: \(requestBody)")
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+            if let bodyString = String(data: request.httpBody!, encoding: .utf8) {
+                print("Тело запроса: \(bodyString)")
+            }
+        } catch {
+            errorMessage = "Ошибка создания запроса: \(error.localizedDescription)"
+            isSendingMessage = false
+            print("Ошибка сериализации JSON: \(error)")
+            return
+        }
+        
+        print("Отправка запроса на \(urlString)")
+        print("Заголовки: \(request.allHTTPHeaderFields ?? [:])")
+        
+        URLSession.shared.dataTask(with: request) { [self] data, response, error in
+            DispatchQueue.main.async {
+                self.isSendingMessage = false
+                
+                if let error = error {
+                    self.errorMessage = "Ошибка сети: \(error.localizedDescription)"
+                    print("Ошибка сети: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.errorMessage = "Некорректный ответ сервера"
+                    print("Ошибка: некорректный ответ сервера")
+                    return
+                }
+                
+                print("Статус код: \(httpResponse.statusCode)")
+                print("Заголовки ответа: \(httpResponse.allHeaderFields)")
+                
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Тело ответа: \(responseString)")
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    self.errorMessage = "Ошибка сервера: статус \(httpResponse.statusCode)"
+                    print("Ошибка сервера: статус \(httpResponse.statusCode)")
+                    return
+                }
+                
+                self.newMessageText = ""
+                self.refreshChat()
+                print("Сообщение успешно отправлено")
+            }
+        }.resume()
+    }
+    
+    private func refreshChat() {
+        guard let chatId = chat?.id else {
+            print("Ошибка: chatId отсутствует")
+            return
+        }
+        
+        let urlString = "http://localhost:3000/api/chats/\(chatId)"
+        print("Обновление чата: \(urlString)")
+        
+        guard let url = URL(string: urlString) else {
+            errorMessage = "Неверный URL"
+            print("Ошибка: неверный URL - \(urlString)")
+            return
+        }
+        
+        guard let token = authManager.authToken else {
+            errorMessage = "Требуется авторизация"
+            print("Ошибка: отсутствует токен авторизации")
             return
         }
         
@@ -170,27 +282,41 @@ struct ChatView: View {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        print("Запрос на обновление чата: \(request)")
+        
+        URLSession.shared.dataTask(with: request) { [self] data, response, error in
             DispatchQueue.main.async {
-                self.isLoadingOwner = false
-                
                 if let error = error {
-                    self.errorMessage = "Ошибка: \(error.localizedDescription)"
+                    print("Ошибка обновления чата: \(error.localizedDescription)")
                     return
                 }
                 
-                guard let data = data else {
-                    self.errorMessage = "Нет данных в ответе"
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("Некорректный ответ сервера при обновлении чата")
                     return
+                }
+                
+                print("Статус код обновления чата: \(httpResponse.statusCode)")
+                
+                guard let data = data else {
+                    print("Нет данных при обновлении чата")
+                    return
+                }
+                
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Ответ обновления чата: \(responseString)")
                 }
                 
                 do {
                     let decoder = JSONDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    let decodedResponse = try decoder.decode(User.self, from: data)
-                    self.ownerDetails = decodedResponse
+                    let updatedChat = try decoder.decode(Chat.self, from: data)
+                    self.chat = updatedChat
+                    self.lastUpdate = Date()
+                    print("Чат успешно обновлен")
                 } catch {
-                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)"
+                    print("Ошибка декодирования чата: \(error.localizedDescription)")
+                    print("Полный текст ошибки: \(error)")
                 }
             }
         }.resume()
@@ -337,35 +463,97 @@ struct ChatView: View {
         }.resume()
     }
     
-    private func sendMessage() {
-        // TODO: Реализация отправки сообщения
-        newMessageText = ""
+    private func fetchOwnerDetails(ownerId: Int) {
+        guard authManager.isAuthenticated, let token = authManager.authToken else {
+            errorMessage = "Требуется авторизация"
+            return
+        }
+        
+        isLoadingOwner = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "http://localhost:3000/api/users/\(ownerId)") else {
+            isLoadingOwner = false
+            errorMessage = "Неверный URL"
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                self.isLoadingOwner = false
+                
+                if let error = error {
+                    self.errorMessage = "Ошибка: \(error.localizedDescription)"
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "Нет данных в ответе"
+                    return
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    let decodedResponse = try decoder.decode(User.self, from: data)
+                    self.ownerDetails = decodedResponse
+                } catch {
+                    self.errorMessage = "Ошибка декодирования: \(error.localizedDescription)"
+                }
+            }
+        }.resume()
     }
 }
 
 struct ChatMessagesView: View {
     let chat: Chat
-    @EnvironmentObject private var authManager: AuthManager
+    let currentUserId: Int?
+    let onRefresh: () -> Void
     
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                if chat.messages.isEmpty {
-                    Text("Нет сообщений")
-                        .foregroundColor(.gray)
-                        .padding()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ForEach(chat.messages) { message in
-                        MessageView(message: message,
-                                  isCurrentUser: message.sender.id == authManager.currentUser?.id)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if chat.messages.isEmpty {
+                        Text("Нет сообщений")
+                            .foregroundColor(.gray)
+                            .padding()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ForEach(chat.messages) { message in
+                            MessageView(
+                                message: message,
+                                isCurrentUser: message.sender.id == currentUserId
+                            )
+                        }
                     }
                 }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
+            .background(Color(hex: "#F4F4F4"))
+            .onAppear {
+                scrollToBottom(proxy: proxy)
+            }
+            .onChange(of: chat.messages.count) { _ in
+                scrollToBottom(proxy: proxy)
+            }
+            .refreshable {
+                onRefresh()
+            }
         }
-        .background(Color(hex: "#F4F4F4"))
+    }
+    
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        if let lastMessage = chat.messages.last {
+            withAnimation {
+                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            }
+        }
     }
 }
 
@@ -374,30 +562,45 @@ struct MessageView: View {
     let isCurrentUser: Bool
     
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 8) {
             if isCurrentUser {
                 Spacer()
-            }
-            
-            VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(isCurrentUser ? Color.blue : Color.white)
-                    .foregroundColor(isCurrentUser ? .white : .black)
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                 
-                Text(formatDate(message.createdAt))
-                    .font(.system(size: 11))
-                    .foregroundColor(.gray)
-            }
-            
-            if !isCurrentUser {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(message.content)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    
+                    Text(formatDate(message.createdAt))
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+                .padding(.trailing, 16)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message.content)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.white)
+                        .foregroundColor(.black)
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    
+                    Text(formatDate(message.createdAt))
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+                .padding(.leading, 16)
+                
                 Spacer()
             }
         }
-        .padding(.horizontal, 16)
+        .id(message.id)
+        .transition(.opacity)
     }
     
     private func formatDate(_ dateString: String) -> String {
